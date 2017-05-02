@@ -1,0 +1,145 @@
+---
+title: "Word Analysis"
+author: "Daniel Chen"
+output: 
+  html_document: 
+    toc: yes
+---
+
+```{r, message=FALSE}
+library(dplyr)
+library(wordcloud)
+library(ggplot2)
+
+rm(list = ls())
+if (interactive()){
+  data_loc <- 'output/data.RData'
+} else {
+  data_loc <- '../output/data.RData'
+}
+
+load(data_loc)
+```
+
+# Sentiment Responses
+
+```{r}
+table(data$category, data$choice, useNA = 'always') %>% addmargins()
+```
+
+`realbad`-`f` and `realgood`-`j` cells are mismatched answers
+
+# Mismatched responses
+
+```{r}
+data %>%
+  filter((category == 'realbad' & choice == 'f') | (category == 'realgood' & choice == 'j')) %>%
+  select(word, category, choice) %>%
+  group_by(word, category, choice) %>%
+  summarize(n = n()) %>%
+  arrange(-n, word) %>%
+  print(n = nrow(.))
+```
+
+# Summary Statistics on Reaction Times
+
+```{r}
+stats <- data %>%
+  group_by(category) %>%
+  summarize(avg_rt = mean(rt),
+            sd_rt = sd(rt), 
+            q1 = quantile(rt, 0.25),
+            q3 = quantile(rt, 0.75))
+
+print(stats)
+```
+
+# Slow and Fast Reaction Words
+
+```{r}
+fbt <- as.numeric(stats[stats$category == 'realbad', 'q1'])
+fgt <- as.numeric(stats[stats$category == 'realgood', 'q1'])
+
+fast_bad_words <- data[data$rt <=  fbt & data$category == 'realbad', 'word']
+fast_good_words <- data[data$rt <= fgt & data$category == 'realgood', 'word']
+
+sbt <- as.numeric(stats[stats$category == 'realbad', 'q3'])
+sgt <- as.numeric(stats[stats$category == 'realgood', 'q1'])
+
+slow_bad_words <- data[data$rt >= sbt & data$category == 'realbad', 'word']
+slow_good_words <- data[data$rt >= sgt & data$category == 'realgood', 'word']
+```
+
+
+```{r}
+fast_bad_words
+fast_good_words
+slow_bad_words
+slow_good_words
+```
+
+# Comparison Word Cloud
+
+```{r}
+words <- c(fast_bad_words, fast_good_words, slow_bad_words, slow_good_words)
+
+words_tbl <- tibble(words) %>%
+  inner_join(data, by = c('words' = 'word')) %>%
+  select(subjuuid, id, words, category, rt)
+```
+
+```{r, warning=FALSE, fig.width=8, fig.height=8}
+# invert the response time, so smaller values get a bigger word
+words_tbl <- words_tbl %>%
+  arrange(-rt)
+
+words_tbl$rt_ranked <- 1:nrow(words_tbl)
+words_tbl$txf_rank <- words_tbl$rt_ranked
+
+words_tbl$rt_invert <- 1 / words_tbl$rt
+
+word_dat <- words_tbl %>%
+  reshape2::acast(words ~ category, value.var = "rt_invert", fill = 0, fun.aggregate = mean)
+
+word_dat %>%
+  comparison.cloud(colors = c("#F8766D", "#00BFC4"), scale=c(2.5, .25))
+```
+
+
+# Comparison Word Plot
+
+```{r, fig.width=8, fig.height=11}
+df <- as_data_frame(word_dat)
+df$word <- row.names(word_dat)
+
+df <- df %>%
+  select(word, realgood, realbad) %>%
+  tidyr::gather(sentiment, score, realgood:realbad) %>%
+  filter(score > .00125) %>%
+  mutate(score_flip = ifelse(sentiment == "realgood", score, -score)) %>%
+  mutate(word = reorder(word, score_flip))
+
+ggplot(df, aes(word, score, fill = sentiment)) +
+  geom_bar(stat = "identity") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ylab("Speed") +
+  coord_flip() +
+  theme_minimal()
+```
+
+Longer the bar, the faster the reponse.
+The bar is the inverse of the original `rt` variable.
+
+
+# Lengh of word
+
+```{r}
+words_tbl$word_len <- nchar(words_tbl$words)
+
+ggplot(words_tbl, aes(x = word_len, y = rt, color = category)) +
+  geom_point() +
+  geom_smooth() + 
+  theme_minimal()
+```
+
+Length of the word does not play a role in `rt`
