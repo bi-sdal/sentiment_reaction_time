@@ -11,14 +11,41 @@ library(dplyr)
 library(wordcloud)
 library(ggplot2)
 
+knitr::opts_chunk$set(fig.width = 8)
+
 rm(list = ls())
-if (interactive()){
+if (interactive()) {
   data_loc <- 'output/data.RData'
 } else {
   data_loc <- '../output/data.RData'
 }
 
 load(data_loc)
+
+```
+# Subjects
+Subjects used in this analysis
+
+```{r}
+subs <- unique(data[, c("subjuuid", "sub_num")])
+subs %>% arrange(sub_num)
+```
+
+```{r}
+nrow(subs)
+```
+
+# Missed words
+
+```{r}
+data %>%
+  select(subjuuid, word, category, sub_num, rt) %>%
+  filter(rt < 0)
+```
+
+```{r}
+data <- data %>%
+  filter(rt >= 0)
 ```
 
 # Sentiment Responses
@@ -64,7 +91,7 @@ fast_bad_words <- data[data$rt <=  fbt & data$category == 'realbad', 'word']
 fast_good_words <- data[data$rt <= fgt & data$category == 'realgood', 'word']
 
 sbt <- as.numeric(stats[stats$category == 'realbad', 'q3'])
-sgt <- as.numeric(stats[stats$category == 'realgood', 'q1'])
+sgt <- as.numeric(stats[stats$category == 'realgood', 'q3'])
 
 slow_bad_words <- data[data$rt >= sbt & data$category == 'realbad', 'word']
 slow_good_words <- data[data$rt >= sgt & data$category == 'realgood', 'word']
@@ -81,65 +108,81 @@ slow_good_words
 # Comparison Word Cloud
 
 ```{r}
-words <- c(fast_bad_words, fast_good_words, slow_bad_words, slow_good_words)
+# fs_words <- c(fast_bad_words, fast_good_words, slow_bad_words, slow_good_words)
 
-words_tbl <- tibble(words) %>%
-  inner_join(data, by = c('words' = 'word')) %>%
-  select(subjuuid, id, words, category, rt)
+#fs_words_tbl <- tibble(fs_words) %>%
+#  inner_join(data, by = c('fs_words' = 'word')) %>%
+
+fs_words_tbl <- data %>%
+  select(subjuuid, id, word, category, rt) %>%
+  filter(category %in% c('realbad', 'realgood')) %>%
+  mutate(rt_invert = 1 / rt) %>%
+  mutate(score_flip = ifelse(category == "realgood", rt_invert, -1 * rt_invert)) %>%
+  #unique() %>%
+  mutate(word = reorder(word, score_flip))
+
+words_tbl_vis <- fs_words_tbl %>%
+  group_by(category, word) %>%
+  summarize(speed = mean(rt_invert))
+
+# rank the words by time
+# words_tbl$rt_ranked <- 1:nrow(words_tbl)
+# words_tbl$txf_rank <- words_tbl$rt_ranked
+
 ```
 
 ```{r, warning=FALSE, fig.width=8, fig.height=8}
-# invert the response time, so smaller values get a bigger word
-words_tbl <- words_tbl %>%
-  arrange(-rt)
-
-words_tbl$rt_ranked <- 1:nrow(words_tbl)
-words_tbl$txf_rank <- words_tbl$rt_ranked
-
-words_tbl$rt_invert <- 1 / words_tbl$rt
-
-word_dat <- words_tbl %>%
-  reshape2::acast(words ~ category, value.var = "rt_invert", fill = 0, fun.aggregate = mean)
-
-word_dat %>%
-  comparison.cloud(colors = c("#F8766D", "#00BFC4"), scale=c(2.5, .25))
+words_tbl_vis %>%
+  reshape2::acast(word ~ category, value.var = "speed", fill = 0) %>%
+  comparison.cloud(colors = c("#F8766D", "#00BFC4"), scale = c(4,.5))
 ```
 
+Word cloud of `readlgood` vs `realbad` categorized words.
+
+Size of word is based on the inverse $(1 / rt)$of the `rt`, the `speed`
 
 # Comparison Word Plot
 
-```{r, fig.width=8, fig.height=11}
-df <- as_data_frame(word_dat)
-df$word <- row.names(word_dat)
-
-df <- df %>%
-  select(word, realgood, realbad) %>%
-  tidyr::gather(sentiment, score, realgood:realbad) %>%
-  filter(score > .00125) %>%
-  mutate(score_flip = ifelse(sentiment == "realgood", score, -score)) %>%
-  mutate(word = reorder(word, score_flip))
-
-ggplot(df, aes(word, score, fill = sentiment)) +
-  geom_bar(stat = "identity") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-  ylab("Speed") +
-  coord_flip() +
-  theme_minimal()
+```{r, fig.width=8, fig.height=12}
+words_tbl_vis %>%
+  filter(speed > .0015) %>%
+  ggplot(aes(word, speed, fill = category)) +
+    geom_bar(stat = "identity") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    ylab("Speed") +
+    coord_flip() +
+    theme_minimal() +
+    theme(legend.position = c(.9, 0.5))
 ```
 
 Longer the bar, the faster the reponse.
 The bar is the inverse of the original `rt` variable.
 
+These results should match the word cloud
 
 # Lengh of word
 
 ```{r}
-words_tbl$word_len <- nchar(words_tbl$words)
+fs_words_tbl$word_len <- nchar(as.character(fs_words_tbl$word))
 
-ggplot(words_tbl, aes(x = word_len, y = rt, color = category)) +
-  geom_point() +
-  geom_smooth() + 
-  theme_minimal()
+base_g <- ggplot(fs_words_tbl, aes(x = as.factor(word_len), y = rt)) + theme_minimal()
 ```
+
+```{r}
+base_g + geom_boxplot()
+```
+
+```{r}
+base_g + geom_violin()
+```
+
+```{r}
+base_g + geom_boxplot(aes(color = category)) + theme(legend.position = c(0.9, 0.9))
+```
+
+```{r}
+base_g + geom_violin(aes(color = category)) + theme(legend.position = c(0.9, 0.9))
+```
+
 
 Length of the word does not play a role in `rt`
