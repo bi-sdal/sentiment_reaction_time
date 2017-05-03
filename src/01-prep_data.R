@@ -3,12 +3,18 @@ library(magrittr)
 
 rm(list = ls())
 
-LARGEST_ID <- 10
+LARGEST_ID <- 50
 
-ids <- read_delim(file = 'data/allAnonymizedSubjectStats.txt', delim = '\t', skip = 1,
+sub_stats <- list.files(path = 'data', pattern = 'allAnonymizedSubjectStats*', full.names = TRUE)
+sub_actions <- list.files(path = 'data', pattern = 'allSubjectActionsOutput*', full.names = TRUE)
+
+id_data_l <- lapply(X = sub_stats, FUN = read_delim, delim = '\t', skip = 1,
                   col_names = c('uuid', 'var1', 'sub_num', 'var2', 'var3'))
 
-df <- read_delim(file = 'data/allSubjectActionsOutput.txt', delim = '\t',)
+action_data_l <- lapply(X = sub_actions, FUN = read_delim, delim = '\t')
+
+ids <- do.call(what = rbind, args = id_data_l)
+df <- do.call(rbind, action_data_l)
 
 ids$id <- as.numeric(ids$sub_num)
 ids <- ids[ids$id < LARGEST_ID, ]
