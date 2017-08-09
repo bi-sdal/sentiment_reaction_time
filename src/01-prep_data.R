@@ -27,7 +27,6 @@ data <- merge(x = df, y = ids, by.x = 'subjuuid', by.y = 'uuid')
 
 good_uuid <- ids$uuid
 
-data <- data %>%
-  filter(subjuuid %in% good_uuid)
+data <- data[data$subjuuid %in% data$good_uuid, ]
 
 save(data, file = 'output/data.RData')
