@@ -1,9 +1,11 @@
 library(dplyr)
 library(ggplot2)
 
-ids <- read.table(file = 'data/allAnonymizedSubjectStats.txt', header = FALSE, sep = '\t', stringsAsFactor = FALSE, skip = 1)
+ids <- read.table(file = 'data/merged-allAnonymizedSubjectStats.txt',
+                  header = FALSE, sep = '\t', stringsAsFactor = FALSE, skip = 1)
 
-df <- read.table(file = 'data/allSubjectActionsOutput.txt', header = TRUE, sep = '\t', stringsAsFactor = FALSE)
+df <- read.table(file = 'data/merged-allSubjectActionsOutput.txt',
+                 header = TRUE, sep = '\t', stringsAsFactor = FALSE)
 
 ids$id <- as.numeric(as.character(ids$V3))
 ids <- ids[ids$id < 10, ]
@@ -65,7 +67,7 @@ g + geom_density()
 
 ## density plot by category only
 ggplot(data = df, aes(x = rt, color = category)) +
-    geom_density() + 
+    geom_density() +
     theme_minimal()
 
 print(stats)
