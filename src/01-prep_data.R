@@ -1,5 +1,4 @@
 library(readr)
-library(magrittr)
 
 rm(list = ls())
 
