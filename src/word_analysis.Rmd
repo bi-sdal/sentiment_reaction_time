@@ -4,6 +4,8 @@ author: "Daniel Chen"
 output: 
   html_document: 
     toc: yes
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r, message=FALSE}
@@ -19,16 +21,19 @@ if (interactive()) {
 } else {
   data_loc <- '../output/data.RData'
 }
-
-load(data_loc)
-
+data_loc
 ```
+
+```{r}
+load(data_loc)
+```
+
 # Subjects
 Subjects used in this analysis
 
 ```{r}
-subs <- unique(data[, c("subjuuid", "sub_num")])
-subs %>% arrange(sub_num)
+subs <- unique(data[, c("subjuuid", "username")])
+subs %>% arrange(username)
 ```
 
 ```{r}
@@ -39,7 +44,7 @@ nrow(subs)
 
 ```{r}
 data %>%
-  select(subjuuid, word, category, sub_num, rt) %>%
+  select(subjuuid, word, category, username, rt) %>%
   filter(rt < 0)
 ```
 
@@ -114,7 +119,7 @@ slow_good_words
 #  inner_join(data, by = c('fs_words' = 'word')) %>%
 
 fs_words_tbl <- data %>%
-  select(subjuuid, id, word, category, rt) %>%
+  select(subjuuid, username, word, category, rt) %>%
   filter(category %in% c('realbad', 'realgood')) %>%
   mutate(rt_invert = 1 / rt) %>%
   mutate(score_flip = ifelse(category == "realgood", rt_invert, -1 * rt_invert)) %>%

@@ -1,31 +1,39 @@
 library(readr)
+library(testthat)
 
 rm(list = ls())
 
+# This number is used to distinguish between test IDs and actual IDs
+# IDs larger than this number will be dropped
 LARGEST_ID <- 50
 
-sub_stats <- list.files(path = 'data', pattern = '*allAnonymizedSubjectStats*', full.names = TRUE)
-sub_actions <- list.files(path = 'data', pattern = '*allSubjectActionsOutput*', full.names = TRUE)
+# Load data and test column names ####
 
-id_data_l <- lapply(X = sub_stats, FUN = read_delim, delim = '\t', skip = 1,
-                  col_names = c('uuid', 'var1', 'sub_num', 'var2', 'var3'))
+df <- read_delim("data/merged-allSubjectActionsOutput.txt",
+                                 "\t", escape_double = FALSE, trim_ws = TRUE)
 
-action_data_l <- lapply(X = sub_actions, FUN = read_delim, delim = '\t')
+ids <- read_delim("data/merged-allAnonymizedSubjectStats.txt",
+                            "\t", escape_double = FALSE, trim_ws = TRUE)
 
-ids <- do.call(what = rbind, args = id_data_l)
-df <- do.call(rbind, action_data_l)
+expect_equal(names(df),
+             c("subjuuid", "word", "category", "choice", "rt", "order"),
+             label = 'Column names in the subject action df')
 
-ids$id <- as.numeric(ids$sub_num)
-ids <- ids[ids$id < LARGEST_ID, ]
+expect_equal(names(ids),
+             c("UUID", "dateStarted", "username", "Real"),
+             label = 'Column names in the subject stats df')
 
-missing_cols <- sapply(ids, function(x) all(is.na(x)))
-ids <- ids[, !missing_cols]
+
+# Clean columns for export ####
+
+# Assumes that the username is a numeric
+# some of them contain letters, which were mainly used for testing
+ids$username <- as.numeric(ids$username)
+ids <- ids[ids$username <= LARGEST_ID, ]
+
+# there should be no missing data in this dataset
 ids <- ids[complete.cases(ids), ]
 
-data <- merge(x = df, y = ids, by.x = 'subjuuid', by.y = 'uuid')
-
-good_uuid <- ids$uuid
-
-data <- data[data$subjuuid %in% data$good_uuid, ]
+data <- merge(x = df, y = ids, by.x = 'subjuuid', by.y = 'UUID')
 
 save(data, file = 'output/data.RData')
